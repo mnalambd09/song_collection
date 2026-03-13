@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>সুর লহরী - আনলিমিটেড বাংলা গান</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;600;700&display=swap');
+        body { background-color: #0b0e14; color: #e2e8f0; font-family: 'Hind Siliguri', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .artist-card:hover img { transform: scale(1.1); transition: 0.4s; }
+        .active-song { background: #1e293b; border-left: 4px solid #3b82f6; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
+</head>
+<body class="pb-32">
+
+    <!-- Navbar & Search -->
+    <nav class="p-6 sticky top-0 z-50 glass mb-8">
+        <div class="container mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent cursor-pointer" onclick="location.reload()">
+                সুর লহরী
+            </h1>
+            <div class="relative w-full md:w-1/2">
+                <input type="text" id="globalSearch" onkeyup="if(event.key === 'Enter') searchAll()" 
+                    placeholder="গান, শিল্পী বা অ্যালবামের নাম লিখে এন্টার চাপুন..." 
+                    class="w-full bg-slate-800 border-none rounded-full py-3 px-6 focus:ring-2 focus:ring-blue-500 outline-none">
+                <button onclick="searchAll()" class="absolute right-4 top-3 text-blue-400"><i class="fas fa-search"></i></button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4">
+        <!-- Default Popular Artists -->
+        <div id="artistSection">
+            <h2 class="text-2xl font-semibold mb-6 flex items-center gap-2">
+                <i class="fas fa-users text-blue-500"></i> জনপ্রিয় শিল্পী
+            </h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6" id="popularArtists">
+                <!-- JS will insert artists here -->
+            </div>
+        </div>
+
+        <!-- Search Results / Song List -->
+        <div id="songSection" class="hidden">
+            <button onclick="backToHome()" class="mb-6 flex items-center gap-2 text-slate-400 hover:text-white transition">
+                <i class="fas fa-chevron-left"></i> ফিরে যান
+            </button>
+            
+            <div id="resultsHeader" class="flex flex-col md:flex-row gap-8 items-center mb-8 p-8 glass rounded-3xl">
+                <!-- Artist/Album Info Header -->
+            </div>
+
+            <div class="mb-4">
+                <input type="text" id="songFilter" placeholder="এই লিস্ট থেকে গান খুঁজুন..." 
+                    class="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm">
+            </div>
+
+            <div class="grid gap-2" id="songList">
+                <!-- Songs will appear here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Player Bar -->
+    <div id="playerBar" class="fixed bottom-0 left-0 right-0 glass border-t border-slate-800 p-4 transform translate-y-full transition-transform duration-500">
+        <div class="container mx-auto flex items-center justify-between gap-4">
+            <div class="flex items-center gap-4 w-1/3">
+                <img id="playerImg" src="" class="w-14 h-14 rounded-lg shadow-lg">
+                <div class="hidden md:block">
+                    <h4 id="playerTitle" class="font-bold truncate w-48">গানের নাম</h4>
+                    <p id="playerArtist" class="text-xs text-slate-400 truncate w-48">শিল্পীর নাম</p>
+                </div>
+            </div>
+            
+            <div class="flex flex-col items-center w-full md:w-1/3">
+                <audio id="mainAudio" controls class="h-10 w-full"></audio>
+            </div>
+
+            <div class="w-1/3 text-right hidden md:block">
+                <i class="fas fa-volume-up text-slate-400"></i>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://saavn.dev/api";
+        const popularArtists = [
+            { name: "James", id: "468352", img: "https://c.saavncdn.com/artists/James_004_20191111082502_500x500.jpg" },
+            { name: "Ayub Bachchu", id: "468354", img: "https://c.saavncdn.com/artists/Ayub_Bachchu_500x500.jpg" },
+            { name: "Tahsan", id: "468245", img: "https://c.saavncdn.com/artists/Tahsan_500x500.jpg" },
+            { name: "Habib Wahid", id: "468190", img: "https://c.saavncdn.com/artists/Habib_Wahid_500x500.jpg" },
+            { name: "Artcell", id: "468228", img: "https://c.saavncdn.com/artists/Artcell_500x500.jpg" },
+            { name: "Atif Aslam", id: "459320", img: "https://c.saavncdn.com/artists/Atif_Aslam_500x500.jpg" }
+        ];
+
+        // লোড শিল্পী
+        function init() {
+            const grid = document.getElementById('popularArtists');
+            popularArtists.forEach(artist => {
+                grid.innerHTML += `
+                    <div class="artist-card glass p-4 rounded-2xl cursor-pointer text-center group" onclick="fetchArtistSongs('${artist.id}')">
+                        <div class="overflow-hidden rounded-full mb-4 w-32 h-32 mx-auto border-4 border-slate-800 group-hover:border-blue-500 transition">
+                            <img src="${artist.img}" class="w-full h-full object-cover">
+                        </div>
+                        <h3 class="font-bold text-lg">${artist.name}</h3>
+                    </div>
+                `;
+            });
+        }
+
+        // শিল্পীর গান নিয়ে আসা
+        async function fetchArtistSongs(artistId) {
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_URL}/artists?id=${artistId}`);
+                const data = await response.json();
+                renderSongPage(data.data.name, data.data.image[2].link, data.data.topSongs);
+            } catch (error) {
+                alert("গান লোড করতে সমস্যা হয়েছে!");
+            }
+            showLoading(false);
+        }
+
+        // গ্লোবাল সার্চ (গান বা শিল্পী)
+        async function searchAll() {
+            const query = document.getElementById('globalSearch').value;
+            if(!query) return;
+            
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_URL}/search/songs?query=${query}`);
+                const data = await response.json();
+                renderSongPage(`সার্চ রেজাল্ট: ${query}`, null, data.data.results);
+            } catch (error) {
+                alert("সার্চ করতে সমস্যা হয়েছে!");
+            }
+            showLoading(false);
+        }
+
+        // গান প্রদর্শন করা
+        function renderSongPage(title, img, songs) {
+            document.getElementById('artistSection').classList.add('hidden');
+            const songSection = document.getElementById('songSection');
+            songSection.classList.remove('hidden');
+
+            const header = document.getElementById('resultsHeader');
+            header.innerHTML = img ? `
+                <img src="${img}" class="w-48 h-48 rounded-2xl shadow-2xl">
+                <div class="text-center md:text-left">
+                    <h2 class="text-4xl font-bold mb-2">${title}</h2>
+                    <p class="text-slate-400">টপ গানগুলো উপভোগ করুন</p>
+                </div>
+            ` : `<h2 class="text-3xl font-bold">${title}</h2>`;
+
+            const list = document.getElementById('songList');
+            list.innerHTML = "";
+            
+            songs.forEach((song, index) => {
+                const songTitle = song.name || song.title;
+                const artistName = song.primaryArtists || "Unknown Artist";
+                const playUrl = song.downloadUrl[song.downloadUrl.length - 1].link; // Best quality
+                const thumb = song.image[1].link;
+
+                list.innerHTML += `
+                    <div class="song-item glass p-4 rounded-xl flex items-center justify-between hover:bg-slate-800 transition cursor-pointer group" 
+                        onclick="playSong('${songTitle.replace(/'/g, "")}', '${artistName.replace(/'/g, "")}', '${playUrl}', '${thumb}', this)">
+                        <div class="flex items-center gap-4">
+                            <span class="text-slate-500 w-6">${index + 1}</span>
+                            <img src="${thumb}" class="w-12 h-12 rounded">
+                            <div>
+                                <h4 class="font-semibold text-sm md:text-base">${songTitle}</h4>
+                                <p class="text-xs text-slate-400">${artistName}</p>
+                            </div>
+                        </div>
+                        <i class="fas fa-play-circle text-2xl text-blue-500 opacity-0 group-hover:opacity-100 transition"></i>
+                    </div>
+                `;
+            });
+        }
+
+        // গান প্লে করা
+        function playSong(title, artist, url, img, element) {
+            // UI Update
+            document.querySelectorAll('.song-item').forEach(el => el.classList.remove('active-song'));
+            element.classList.add('active-song');
+
+            // Player Update
+            const playerBar = document.getElementById('playerBar');
+            const audio = document.getElementById('mainAudio');
+            
+            playerBar.style.transform = "translateY(0)";
+            document.getElementById('playerTitle').innerText = title;
+            document.getElementById('playerArtist').innerText = artist;
+            document.getElementById('playerImg').src = img;
+            
+            audio.src = url;
+            audio.play();
+        }
+
+        function backToHome() {
+            document.getElementById('artistSection').classList.remove('hidden');
+            document.getElementById('songSection').classList.add('hidden');
+        }
+
+        function showLoading(status) {
+            document.body.style.cursor = status ? 'wait' : 'default';
+        }
+
+        // ফিল্টার ফাংশনালিটি
+        document.getElementById('songFilter').addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('.song-item').forEach(item => {
+                const text = item.innerText.toLowerCase();
+                item.style.display = text.includes(term) ? 'flex' : 'none';
+            });
+        });
+
+        init();
+    </script>
+</body>
+</html>
